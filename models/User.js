@@ -17,16 +17,19 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// 🔐 HASH PASSWORD
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });
 
+// 🔑 MATCH PASSWORD
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
+// ❌ hide password
 userSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
