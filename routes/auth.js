@@ -6,10 +6,10 @@ const {
   login,
   getMe,
   changePassword,
+  sendOtp,
+  verifyOtp,
   resetPassword
 } = require('../controllers/authController');
-
-const User = require('../models/User');
 
 // ================= ROUTES =================
 
@@ -19,18 +19,11 @@ router.post('/register', register);
 // Login
 router.post('/login', login);
 
-// 🔥 CHECK USER (NEW)
-router.post('/check-user', async (req, res) => {
-  const { phone } = req.body;
+// 🔥 SEND OTP
+router.post('/send-otp', sendOtp);
 
-  const user = await User.findOne({ phone });
-
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
-  }
-
-  res.json({ message: "User exists" });
-});
+// 🔥 VERIFY OTP
+router.post('/verify-otp', verifyOtp);
 
 // Reset Password
 router.post('/reset-password', resetPassword);
