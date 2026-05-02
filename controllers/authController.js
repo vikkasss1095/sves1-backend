@@ -2,12 +2,41 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 
+// 🔐 TOKEN
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: '7d',
   });
 
-// 🔐 LOGIN
+/* ================= REGISTER ================= */
+const register = async (req, res) => {
+  try {
+    const { name, email, password, phone } = req.body;
+
+    const userExists = await User.findOne({ email: email.toLowerCase() });
+
+    if (userExists) {
+      return res.status(400).json({ message: 'User already exists' });
+    }
+
+    const user = await User.create({
+      name,
+      email: email.toLowerCase(),
+      password,
+      phone,
+    });
+
+    res.status(201).json({
+      message: 'User registered successfully',
+      token: generateToken(user._id),
+      user,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/* ================= LOGIN ================= */
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -24,10 +53,6 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    if (!user.isActive) {
-      return res.status(403).json({ message: 'Account deactivated' });
-    }
-
     res.json({
       token: generateToken(user._id),
       user,
@@ -37,7 +62,38 @@ const login = async (req, res) => {
   }
 };
 
-// 🔥 SEND OTP
+/* ================= GET PROFILE ================= */
+const getMe = async (req, res) => {
+  try {
+    res.json(req.user);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/* ================= CHANGE PASSWORD ================= */
+const changePassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+
+    const user = await User.findById(req.user._id);
+
+    const isMatch = await user.matchPassword(oldPassword);
+
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Old password incorrect' });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/* ================= SEND OTP ================= */
 const sendOtp = async (req, res) => {
   try {
     const { phone } = req.body;
@@ -55,7 +111,7 @@ const sendOtp = async (req, res) => {
 
     await user.save();
 
-    console.log("OTP:", otp); // testing
+    console.log("OTP:", otp);
 
     res.json({ message: 'OTP sent successfully' });
   } catch (error) {
@@ -63,7 +119,7 @@ const sendOtp = async (req, res) => {
   }
 };
 
-// 🔥 VERIFY OTP
+/* ================= VERIFY OTP ================= */
 const verifyOtp = async (req, res) => {
   try {
     const { phone, otp } = req.body;
@@ -80,14 +136,16 @@ const verifyOtp = async (req, res) => {
   }
 };
 
-// 🔥 RESET PASSWORD
+/* ================= RESET PASSWORD ================= */
 const resetPassword = async (req, res) => {
   try {
     const { phone, newPassword } = req.body;
 
     const user = await User.findOne({ phone });
 
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
     user.password = await bcrypt.hash(newPassword, 10);
     user.otp = null;
@@ -101,8 +159,12 @@ const resetPassword = async (req, res) => {
   }
 };
 
+/* ================= EXPORT ================= */
 module.exports = {
+  register,
   login,
+  getMe,
+  changePassword,
   sendOtp,
   verifyOtp,
   resetPassword,
