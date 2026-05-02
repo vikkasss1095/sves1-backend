@@ -168,3 +168,11 @@ module.exports = {
   verifyOtp,
   resetPassword,
 };
+
+console.log({
+  register,
+  login,
+  sendOtp,
+  verifyOtp,
+  resetPassword
+});
