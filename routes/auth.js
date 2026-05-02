@@ -1,18 +1,17 @@
 const express = require('express');
 const router = express.Router();
 
-// ✅ CONTROLLER IMPORT (सबसे important)
 const {
   register,
   login,
   getMe,
   changePassword,
-  sendOtp,
-  verifyOtp,
   resetPassword
 } = require('../controllers/authController');
 
-// ================= AUTH ROUTES =================
+const User = require('../models/User');
+
+// ================= ROUTES =================
 
 // Register
 router.post('/register', register);
@@ -20,9 +19,20 @@ router.post('/register', register);
 // Login
 router.post('/login', login);
 
-// OTP FLOW
-router.post('/send-otp', sendOtp);
-router.post('/verify-otp', verifyOtp);
+// 🔥 CHECK USER (NEW)
+router.post('/check-user', async (req, res) => {
+  const { phone } = req.body;
+
+  const user = await User.findOne({ phone });
+
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  res.json({ message: "User exists" });
+});
+
+// Reset Password
 router.post('/reset-password', resetPassword);
 
 // Profile
