@@ -20,12 +20,12 @@ app.use(
 );
 
 // ================= ROUTES IMPORT =================
-const authRoutes = require('./routes/auth');
-const vendorRoutes = require('./routes/vendor');
-const adminRoutes = require('./routes/admin');
-const taskRoutes = require('./routes/task');
-const paymentRoutes = require('./routes/payment');
-const notificationRoutes = require('./routes/notification');
+// const authRoutes = require('./routes/auth');
+// const vendorRoutes = require('./routes/vendor');
+// const adminRoutes = require('./routes/admin');
+// const taskRoutes = require('./routes/task');
+// const paymentRoutes = require('./routes/payment');
+// const notificationRoutes = require('./routes/notification');
 
 // ================= STATIC =================
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
