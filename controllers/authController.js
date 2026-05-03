@@ -4,7 +4,7 @@ const bcrypt = require("bcryptjs");
 
 /* ================= TOKEN ================= */
 const generateToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET || "secret", {
+  jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: "7d",
   });
 
@@ -13,9 +13,9 @@ const register = async (req, res) => {
   try {
     const { name, email, password, phone } = req.body;
 
-    const userExists = await User.findOne({
-      email: email.toLowerCase(),
-    });
+    const cleanEmail = email.toLowerCase().trim();
+
+    const userExists = await User.findOne({ email: cleanEmail });
 
     if (userExists) {
       return res.status(400).json({ message: "User already exists" });
@@ -25,7 +25,7 @@ const register = async (req, res) => {
 
     const user = await User.create({
       name,
-      email: email.toLowerCase(),
+      email: cleanEmail,
       password: hashedPassword,
       phone,
     });
@@ -45,9 +45,9 @@ const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({
-      email: email.toLowerCase(),
-    });
+    const cleanEmail = email.toLowerCase().trim();
+
+    const user = await User.findOne({ email: cleanEmail });
 
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
@@ -70,14 +70,7 @@ const login = async (req, res) => {
 
 /* ================= GET PROFILE ================= */
 const getMe = async (req, res) => {
-  try {
-    res.json({
-      message: "User fetched",
-      user: req.user || null,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+  res.json({ user: req.user || null });
 };
 
 /* ================= CHANGE PASSWORD ================= */
@@ -102,31 +95,32 @@ const changePassword = async (req, res) => {
   }
 };
 
-/* ================= OTP STORE (TEMP MEMORY) ================= */
+/* ================= OTP STORE ================= */
 const otpStore = {};
 
 /* ================= SEND OTP ================= */
 const sendOtp = async (req, res) => {
   try {
-    const { phone } = req.body;
+    const { email } = req.body;
 
-    const user = await User.findOne({ phone });
+    const cleanEmail = email.toLowerCase().trim();
+
+    const user = await User.findOne({ email: cleanEmail });
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "Email not registered" });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    otpStore[phone] = {
+    otpStore[cleanEmail] = {
       otp,
       expire: Date.now() + 5 * 60 * 1000,
     };
 
-    res.json({
-      message: "OTP sent successfully",
-      otp, // 🔥 frontend में दिखेगा
-    });
+    console.log("OTP:", otp); // 🔥 debug (mail lagane ke baad remove karna)
+
+    res.json({ message: "OTP sent successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -135,9 +129,11 @@ const sendOtp = async (req, res) => {
 /* ================= VERIFY OTP ================= */
 const verifyOtp = async (req, res) => {
   try {
-    const { phone, otp } = req.body;
+    const { email, otp } = req.body;
 
-    const data = otpStore[phone];
+    const cleanEmail = email.toLowerCase().trim();
+
+    const data = otpStore[cleanEmail];
 
     if (!data || data.otp !== otp || data.expire < Date.now()) {
       return res.status(400).json({
@@ -154,9 +150,11 @@ const verifyOtp = async (req, res) => {
 /* ================= RESET PASSWORD ================= */
 const resetPassword = async (req, res) => {
   try {
-    const { phone, newPassword } = req.body;
+    const { email, newPassword } = req.body;
 
-    const user = await User.findOne({ phone });
+    const cleanEmail = email.toLowerCase().trim();
+
+    const user = await User.findOne({ email: cleanEmail });
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -165,11 +163,9 @@ const resetPassword = async (req, res) => {
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
 
-    delete otpStore[phone];
+    delete otpStore[cleanEmail];
 
-    res.json({
-      message: "Password updated successfully",
-    });
+    res.json({ message: "Password updated successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

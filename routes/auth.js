@@ -19,13 +19,8 @@ router.put("/change-password", authController.changePassword);
 
 // ================= FORGOT PASSWORD (OTP FLOW) =================
 
-// 📧 Send OTP (Email)
 router.post("/forgot-password/send-otp", authController.sendOtp);
-
-// ✅ Verify OTP
 router.post("/forgot-password/verify-otp", authController.verifyOtp);
-
-// 🔄 Reset Password
 router.post("/forgot-password/reset-password", authController.resetPassword);
 
 module.exports = router;
