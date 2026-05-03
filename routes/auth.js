@@ -1,37 +1,31 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
 
-const {
-  register,
-  login,
-  getMe,
-  changePassword,
-  sendOtp,
-  verifyOtp,
-  resetPassword
-} = require('../controllers/authController');
+const authController = require("../controllers/authController");
 
-// ================= ROUTES =================
+// ================= AUTH ROUTES =================
 
-// Register
-router.post('/register', register);
+// 🔐 Register
+router.post("/register", authController.register);
 
-// Login
-router.post('/login', login);
+// 🔐 Login
+router.post("/login", authController.login);
 
-// 🔥 SEND OTP
-router.post('/send-otp', sendOtp);
+// 👤 Get Logged-in User
+router.get("/me", authController.getMe);
 
-// 🔥 VERIFY OTP
-router.post('/verify-otp', verifyOtp);
+// 🔑 Change Password (Logged-in)
+router.put("/change-password", authController.changePassword);
 
-// Reset Password
-router.post('/reset-password', resetPassword);
+// ================= FORGOT PASSWORD (OTP FLOW) =================
 
-// Profile
-router.get('/me', getMe);
+// 📧 Send OTP (Email)
+router.post("/forgot-password/send-otp", authController.sendOtp);
 
-// Change Password
-router.put('/change-password', changePassword);
+// ✅ Verify OTP
+router.post("/forgot-password/verify-otp", authController.verifyOtp);
 
-module.exports = router;
+// 🔄 Reset Password
+router.post("/forgot-password/reset-password", authController.resetPassword);
+
+module.exports = router;git add .
