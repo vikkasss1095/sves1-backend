@@ -10,7 +10,14 @@ const generateToken = (id) =>
 /* ================= REGISTER ================= */
 const register = async (req, res) => {
   try {
-    const { name, email, password, phone } = req.body;
+    const {
+      name,
+      email,
+      password,
+      phone,
+      companyName,   // ✅ ADD
+      gstNumber      // ✅ ADD
+    } = req.body;
 
     const cleanEmail = email.toLowerCase().trim();
 
@@ -20,12 +27,13 @@ const register = async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // ❌ YAHAN HASH NAHI KARNA (MODEL KAREGA)
     const user = await User.create({
       name,
       email: cleanEmail,
       password,
       phone,
+      companyName,   // ✅ SAVE
+      gstNumber      // ✅ SAVE
     });
 
     res.status(201).json({
@@ -33,6 +41,7 @@ const register = async (req, res) => {
       token: generateToken(user._id),
       user,
     });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -51,7 +60,6 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // 🔥 MODEL METHOD USE KARO
     const isMatch = await user.matchPassword(password);
 
     if (!isMatch) {
@@ -62,6 +70,7 @@ const login = async (req, res) => {
       token: generateToken(user._id),
       user,
     });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -85,11 +94,11 @@ const changePassword = async (req, res) => {
       return res.status(400).json({ message: "Old password incorrect" });
     }
 
-    // ❌ hash mat kar → model karega
     user.password = newPassword;
     await user.save();
 
     res.json({ message: "Password changed successfully" });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -120,7 +129,8 @@ const sendOtp = async (req, res) => {
 
     console.log("OTP:", otp);
 
-    res.json({ message: "OTP sent successfully", otp }); // debug
+    res.json({ message: "OTP sent successfully" });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -142,6 +152,7 @@ const verifyOtp = async (req, res) => {
     }
 
     res.json({ message: "OTP verified" });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -160,13 +171,13 @@ const resetPassword = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // ❌ hash mat kar → model karega
     user.password = newPassword;
     await user.save();
 
     delete otpStore[cleanEmail];
 
     res.json({ message: "Password updated successfully" });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
