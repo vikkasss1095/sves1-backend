@@ -28,4 +28,4 @@ router.post("/forgot-password/verify-otp", authController.verifyOtp);
 // 🔄 Reset Password
 router.post("/forgot-password/reset-password", authController.resetPassword);
 
-module.exports = router;git add .
+module.exports = router;
