@@ -1,24 +1,21 @@
 const express = require("express");
 const router = express.Router();
-
 const authController = require("../controllers/authController");
+const { protect } = require("../middleware/authMiddleware");
 
-// ================= AUTH ROUTES =================
-
-// 🔐 Register
+// REGISTER
 router.post("/register", authController.register);
 
-// 🔐 Login
+// LOGIN
 router.post("/login", authController.login);
 
-// 👤 Get Logged-in User
-router.get("/me", authController.getMe);
+// 🔥 FIX (IMPORTANT)
+router.get("/me", protect, authController.getMe);
 
-// 🔑 Change Password (Logged-in)
-router.put("/change-password", authController.changePassword);
+// CHANGE PASSWORD
+router.put("/change-password", protect, authController.changePassword);
 
-// ================= FORGOT PASSWORD (OTP FLOW) =================
-
+// OTP
 router.post("/forgot-password/send-otp", authController.sendOtp);
 router.post("/forgot-password/verify-otp", authController.verifyOtp);
 router.post("/forgot-password/reset-password", authController.resetPassword);
