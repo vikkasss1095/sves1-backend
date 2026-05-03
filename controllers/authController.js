@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const nodemailer = require("nodemailer");
 
 /* ================= TOKEN ================= */
 const generateToken = (id) =>
@@ -10,19 +11,11 @@ const generateToken = (id) =>
 /* ================= REGISTER ================= */
 const register = async (req, res) => {
   try {
-    const {
-      name,
-      email,
-      password,
-      phone,
-      companyName,   // ✅ ADD
-      gstNumber      // ✅ ADD
-    } = req.body;
+    const { name, email, password, phone, companyName, gstNumber } = req.body;
 
     const cleanEmail = email.toLowerCase().trim();
 
     const userExists = await User.findOne({ email: cleanEmail });
-
     if (userExists) {
       return res.status(400).json({ message: "User already exists" });
     }
@@ -32,8 +25,8 @@ const register = async (req, res) => {
       email: cleanEmail,
       password,
       phone,
-      companyName,   // ✅ SAVE
-      gstNumber      // ✅ SAVE
+      companyName,
+      gstNumber,
     });
 
     res.status(201).json({
@@ -56,13 +49,7 @@ const login = async (req, res) => {
 
     const user = await User.findOne({ email: cleanEmail });
 
-    if (!user) {
-      return res.status(401).json({ message: "Invalid email or password" });
-    }
-
-    const isMatch = await user.matchPassword(password);
-
-    if (!isMatch) {
+    if (!user || !(await user.matchPassword(password))) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
@@ -88,9 +75,7 @@ const changePassword = async (req, res) => {
 
     const user = await User.findById(req.user._id);
 
-    const isMatch = await user.matchPassword(oldPassword);
-
-    if (!isMatch) {
+    if (!(await user.matchPassword(oldPassword))) {
       return res.status(400).json({ message: "Old password incorrect" });
     }
 
@@ -107,11 +92,21 @@ const changePassword = async (req, res) => {
 /* ================= OTP STORE ================= */
 const otpStore = {};
 
+/* ================= MAIL TRANSPORT ================= */
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
 /* ================= SEND OTP ================= */
 const sendOtp = async (req, res) => {
   try {
     const { email } = req.body;
-
     const cleanEmail = email.toLowerCase().trim();
 
     const user = await User.findOne({ email: cleanEmail });
@@ -129,10 +124,25 @@ const sendOtp = async (req, res) => {
 
     console.log("OTP:", otp);
 
+    // 🔥 SEND EMAIL
+    await transporter.sendMail({
+      from: `"SVES Support" <${process.env.EMAIL_USER}>`,
+      to: cleanEmail,
+      subject: "Your OTP Code",
+      html: `
+        <h2>OTP Verification</h2>
+        <h1>${otp}</h1>
+        <p>This OTP is valid for 5 minutes</p>
+      `,
+    });
+
+    console.log("✅ Mail sent");
+
     res.json({ message: "OTP sent successfully" });
 
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.log("❌ EMAIL ERROR:", error);
+    res.status(500).json({ message: "Email send failed" });
   }
 };
 
@@ -146,9 +156,7 @@ const verifyOtp = async (req, res) => {
     const data = otpStore[cleanEmail];
 
     if (!data || data.otp !== otp || data.expire < Date.now()) {
-      return res.status(400).json({
-        message: "Invalid or expired OTP",
-      });
+      return res.status(400).json({ message: "Invalid or expired OTP" });
     }
 
     res.json({ message: "OTP verified" });
