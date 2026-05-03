@@ -1,10 +1,9 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
-const bcrypt = require("bcryptjs");
 
 /* ================= TOKEN ================= */
 const generateToken = (id) =>
-  jwt.sign({ id }, process.env.JWT_SECRET, {
+  jwt.sign({ id }, process.env.JWT_SECRET || "secret", {
     expiresIn: "7d",
   });
 
@@ -21,12 +20,11 @@ const register = async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
+    // ❌ YAHAN HASH NAHI KARNA (MODEL KAREGA)
     const user = await User.create({
       name,
       email: cleanEmail,
-      password: hashedPassword,
+      password,
       phone,
     });
 
@@ -53,7 +51,8 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    // 🔥 MODEL METHOD USE KARO
+    const isMatch = await user.matchPassword(password);
 
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid email or password" });
@@ -80,13 +79,14 @@ const changePassword = async (req, res) => {
 
     const user = await User.findById(req.user._id);
 
-    const isMatch = await bcrypt.compare(oldPassword, user.password);
+    const isMatch = await user.matchPassword(oldPassword);
 
     if (!isMatch) {
       return res.status(400).json({ message: "Old password incorrect" });
     }
 
-    user.password = await bcrypt.hash(newPassword, 10);
+    // ❌ hash mat kar → model karega
+    user.password = newPassword;
     await user.save();
 
     res.json({ message: "Password changed successfully" });
@@ -118,9 +118,9 @@ const sendOtp = async (req, res) => {
       expire: Date.now() + 5 * 60 * 1000,
     };
 
-    console.log("OTP:", otp); // 🔥 debug (mail lagane ke baad remove karna)
+    console.log("OTP:", otp);
 
-    res.json({ message: "OTP sent successfully" });
+    res.json({ message: "OTP sent successfully", otp }); // debug
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -160,7 +160,8 @@ const resetPassword = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    user.password = await bcrypt.hash(newPassword, 10);
+    // ❌ hash mat kar → model karega
+    user.password = newPassword;
     await user.save();
 
     delete otpStore[cleanEmail];
