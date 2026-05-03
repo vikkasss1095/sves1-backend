@@ -8,6 +8,19 @@ const generateToken = (id) =>
     expiresIn: "7d",
   });
 
+/* ================= OTP STORE ================= */
+const otpStore = {};
+
+/* ================= MAIL CONFIG (FIXED) ================= */
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+  connectionTimeout: 10000, // 🔥 IMPORTANT
+});
+
 /* ================= REGISTER ================= */
 const register = async (req, res) => {
   try {
@@ -36,6 +49,7 @@ const register = async (req, res) => {
     });
 
   } catch (error) {
+    console.log("REGISTER ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -59,53 +73,16 @@ const login = async (req, res) => {
     });
 
   } catch (error) {
+    console.log("LOGIN ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
-
-/* ================= GET PROFILE ================= */
-const getMe = async (req, res) => {
-  res.json({ user: req.user || null });
-};
-
-/* ================= CHANGE PASSWORD ================= */
-const changePassword = async (req, res) => {
-  try {
-    const { oldPassword, newPassword } = req.body;
-
-    const user = await User.findById(req.user._id);
-
-    if (!(await user.matchPassword(oldPassword))) {
-      return res.status(400).json({ message: "Old password incorrect" });
-    }
-
-    user.password = newPassword;
-    await user.save();
-
-    res.json({ message: "Password changed successfully" });
-
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-/* ================= OTP STORE ================= */
-const otpStore = {};
-
-/* ================= MAIL TRANSPORT ================= */
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
 
 /* ================= SEND OTP ================= */
 const sendOtp = async (req, res) => {
   try {
+    console.log("🚀 SEND OTP HIT");
+
     const { email } = req.body;
     const cleanEmail = email.toLowerCase().trim();
 
@@ -122,21 +99,21 @@ const sendOtp = async (req, res) => {
       expire: Date.now() + 5 * 60 * 1000,
     };
 
-    console.log("OTP:", otp);
+    console.log("📧 OTP:", otp);
 
-    // 🔥 SEND EMAIL
+    // 🔥 MAIL SEND
     await transporter.sendMail({
-      from: `"SVES Support" <${process.env.EMAIL_USER}>`,
+      from: process.env.EMAIL_USER,
       to: cleanEmail,
-      subject: "Your OTP Code",
+      subject: "SVES OTP Verification",
       html: `
-        <h2>OTP Verification</h2>
+        <h2>Your OTP Code</h2>
         <h1>${otp}</h1>
-        <p>This OTP is valid for 5 minutes</p>
+        <p>Valid for 5 minutes</p>
       `,
     });
 
-    console.log("✅ Mail sent");
+    console.log("✅ EMAIL SENT");
 
     res.json({ message: "OTP sent successfully" });
 
@@ -152,7 +129,6 @@ const verifyOtp = async (req, res) => {
     const { email, otp } = req.body;
 
     const cleanEmail = email.toLowerCase().trim();
-
     const data = otpStore[cleanEmail];
 
     if (!data || data.otp !== otp || data.expire < Date.now()) {
@@ -195,8 +171,6 @@ const resetPassword = async (req, res) => {
 module.exports = {
   register,
   login,
-  getMe,
-  changePassword,
   sendOtp,
   verifyOtp,
   resetPassword,
