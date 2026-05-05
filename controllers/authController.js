@@ -18,7 +18,7 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  connectionTimeout: 10000, // 🔥 IMPORTANT
+  connectionTimeout: 10000,
 });
 
 /* ================= REGISTER ================= */
@@ -78,6 +78,35 @@ const login = async (req, res) => {
   }
 };
 
+/* ================= GET ME (ADDED) ================= */
+const getMe = async (req, res) => {
+  try {
+    res.json(req.user);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/* ================= CHANGE PASSWORD (ADDED) ================= */
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    const user = await User.findById(req.user._id);
+
+    if (!user || !(await user.matchPassword(currentPassword))) {
+      return res.status(400).json({ message: "Current password incorrect" });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: "Password changed successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 /* ================= SEND OTP ================= */
 const sendOtp = async (req, res) => {
   try {
@@ -101,7 +130,6 @@ const sendOtp = async (req, res) => {
 
     console.log("📧 OTP:", otp);
 
-    // 🔥 MAIL SEND
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: cleanEmail,
@@ -174,4 +202,6 @@ module.exports = {
   sendOtp,
   verifyOtp,
   resetPassword,
+  getMe,           // ✅ ADDED
+  changePassword,  // ✅ ADDED
 };
