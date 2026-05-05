@@ -29,5 +29,5 @@ router.get('/documents', getAllDocuments);
 router.put('/documents/:id', reviewDocument);
 router.get('/payments', getAllPayments);
 router.put('/payments/:id/approve', approvePayment);
-
+router.get('/vendors/:id', getSingleVendor); 
 module.exports = router;
