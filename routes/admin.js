@@ -12,6 +12,7 @@ const {
   reviewDocument,
   getAllPayments,
   approvePayment,
+  getSingleVendor   
 } = require('../controllers/adminController');
 const { protect } = require('../middleware/authMiddleware');
 const { isAdmin } = require('../middleware/roleMiddleware');
