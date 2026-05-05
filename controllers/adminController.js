@@ -135,6 +135,21 @@ const deleteVendor = async (req, res) => {
   }
 };
 
+// 🔥 ✅ ADD KIYA GAYA FUNCTION (ONLY NEW ADDITION)
+const getSingleVendor = async (req, res) => {
+  try {
+    const vendor = await User.findById(req.params.id).select('-password');
+
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found' });
+    }
+
+    res.json(vendor);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @route GET /api/admin/evaluation
 const getVendorRankings = async (req, res) => {
   try {
@@ -280,12 +295,14 @@ const approvePayment = async (req, res) => {
   }
 };
 
+// ✅ FINAL EXPORT (ADD KIYA GAYA)
 module.exports = {
   getDashboardStats,
   getAllVendors,
   approveVendor,
   rejectVendor,
   deleteVendor,
+  getSingleVendor, // 🔥 ADD
   getVendorRankings,
   rateVendor,
   getAllDocuments,
