@@ -1,312 +1,214 @@
-const User = require('../models/User');
-const Task = require('../models/Task');
-const Rating = require('../models/Rating');
-const Document = require('../models/Document');
-const Payment = require('../models/Payment');
-const Notification = require('../models/Notification');
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+const nodemailer = require("nodemailer");
 
-// @route GET /api/admin/dashboard
-const getDashboardStats = async (req, res) => {
+/* ================= TOKEN ================= */
+const generateToken = (id) =>
+  jwt.sign({ id }, process.env.JWT_SECRET || "secret", {
+    expiresIn: "7d",
+  });
+
+/* ================= OTP STORE ================= */
+const otpStore = {};
+
+/* ================= MAIL CONFIG (FIXED) ================= */
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+  connectionTimeout: 10000,
+});
+
+/* ================= REGISTER ================= */
+const register = async (req, res) => {
   try {
-    const [totalVendors, activeVendors, pendingApprovals, totalTasks, completedTasks] =
-      await Promise.all([
-        User.countDocuments({ role: 'vendor' }),
-        User.countDocuments({ role: 'vendor', isApproved: true, isActive: true }),
-        User.countDocuments({ role: 'vendor', isApproved: false, isActive: true }),
-        Task.countDocuments(),
-        Task.countDocuments({ status: 'completed' }),
-      ]);
+    const { name, email, password, phone, companyName, gstNumber } = req.body;
 
-    // Monthly vendor growth (last 6 months)
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const cleanEmail = email.toLowerCase().trim();
 
-    const monthlyGrowth = await User.aggregate([
-      { $match: { role: 'vendor', createdAt: { $gte: sixMonthsAgo } } },
-      {
-        $group: {
-          _id: { month: { $month: '$createdAt' }, year: { $year: '$createdAt' } },
-          count: { $sum: 1 },
-        },
-      },
-      { $sort: { '_id.year': 1, '_id.month': 1 } },
-    ]);
+    const userExists = await User.findOne({ email: cleanEmail });
+    if (userExists) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    const user = await User.create({
+      name,
+      email: cleanEmail,
+      password,
+      phone,
+      companyName,
+      gstNumber,
+    });
+
+    res.status(201).json({
+      message: "User registered successfully",
+      token: generateToken(user._id),
+      user,
+    });
+
+  } catch (error) {
+    console.log("REGISTER ERROR:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/* ================= LOGIN ================= */
+const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const cleanEmail = email.toLowerCase().trim();
+
+    const user = await User.findOne({ email: cleanEmail });
+
+    if (!user || !(await user.matchPassword(password))) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
 
     res.json({
-      totalVendors,
-      activeVendors,
-      pendingApprovals,
-      totalTasks,
-      completedTasks,
-      monthlyGrowth,
+      token: generateToken(user._id),
+      user,
     });
+
   } catch (error) {
+    console.log("LOGIN ERROR:", error);
     res.status(500).json({ message: error.message });
   }
 };
 
-// @route GET /api/admin/vendors
-const getAllVendors = async (req, res) => {
+/* ================= 🔥 GET ME (UPGRADED SAFE VERSION) ================= */
+const getMe = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '', status } = req.query;
-    const query = { role: 'vendor' };
+    // 🔥 ADD KIYA GAYA (IMPORTANT FIX)
+    const user = await User.findById(req.user._id).select("-password");
 
-    if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } },
-        { companyName: { $regex: search, $options: 'i' } },
-      ];
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
 
-    if (status === 'approved') query.isApproved = true;
-    if (status === 'pending') query.isApproved = false;
-
-    const total = await User.countDocuments(query);
-    const vendors = await User.find(query)
-      .select('-password')
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(parseInt(limit));
-
-    res.json({ vendors, total, pages: Math.ceil(total / limit) });
+    res.json(user); // ✅ full user
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// @route PUT /api/admin/vendors/:id/approve
-const approveVendor = async (req, res) => {
+/* ================= CHANGE PASSWORD ================= */
+const changePassword = async (req, res) => {
   try {
-    const vendor = await User.findByIdAndUpdate(
-      req.params.id,
-      { isApproved: true },
-      { new: true }
-    );
+    const { currentPassword, newPassword } = req.body;
 
-    if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+    const user = await User.findById(req.user._id);
 
-    await Notification.create({
-      recipient: vendor._id,
-      sender: req.user._id,
-      type: 'profile_approved',
-      title: 'Account Approved!',
-      message: 'Your vendor account has been approved. You can now receive tasks.',
-    });
-
-    res.json({ message: 'Vendor approved', vendor });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @route PUT /api/admin/vendors/:id/reject
-const rejectVendor = async (req, res) => {
-  try {
-    const vendor = await User.findByIdAndUpdate(
-      req.params.id,
-      { isApproved: false, isActive: false },
-      { new: true }
-    );
-
-    if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
-
-    await Notification.create({
-      recipient: vendor._id,
-      sender: req.user._id,
-      type: 'profile_rejected',
-      title: 'Account Rejected',
-      message: req.body.reason || 'Your vendor account has been rejected by the admin.',
-    });
-
-    res.json({ message: 'Vendor rejected' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @route DELETE /api/admin/vendors/:id
-const deleteVendor = async (req, res) => {
-  try {
-    await User.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Vendor deleted' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// 🔥 ✅ ADD KIYA GAYA FUNCTION (ONLY NEW ADDITION)
-const getSingleVendor = async (req, res) => {
-  try {
-    const vendor = await User.findById(req.params.id).select('-password');
-
-    if (!vendor) {
-      return res.status(404).json({ message: 'Vendor not found' });
+    if (!user || !(await user.matchPassword(currentPassword))) {
+      return res.status(400).json({ message: "Current password incorrect" });
     }
 
-    res.json(vendor);
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: "Password changed successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// @route GET /api/admin/evaluation
-const getVendorRankings = async (req, res) => {
+/* ================= SEND OTP ================= */
+const sendOtp = async (req, res) => {
   try {
-    const vendors = await User.find({ role: 'vendor', isApproved: true }).select('-password');
+    console.log("🚀 SEND OTP HIT");
 
-    const rankings = await Promise.all(
-      vendors.map(async (v) => {
-        const ratings = await Rating.find({ vendor: v._id });
-        const avgScore =
-          ratings.length > 0
-            ? ratings.reduce((sum, r) => sum + r.overallScore, 0) / ratings.length
-            : 0;
+    const { email } = req.body;
+    const cleanEmail = email.toLowerCase().trim();
 
-        const completedTasks = await Task.countDocuments({
-          assignedTo: v._id,
-          status: 'completed',
-        });
-        const totalTasks = await Task.countDocuments({ assignedTo: v._id });
+    const user = await User.findOne({ email: cleanEmail });
 
-        return {
-          vendor: v,
-          avgScore: parseFloat(avgScore.toFixed(2)),
-          ratingsCount: ratings.length,
-          completedTasks,
-          totalTasks,
-          completionRate: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
-        };
-      })
-    );
+    if (!user) {
+      return res.status(404).json({ message: "Email not registered" });
+    }
 
-    rankings.sort((a, b) => b.avgScore - a.avgScore);
-    res.json({ rankings });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-// @route POST /api/admin/ratings
-const rateVendor = async (req, res) => {
-  try {
-    const { vendor, qualityScore, deliveryScore, costEfficiencyScore, complianceScore, feedback, period } = req.body;
+    otpStore[cleanEmail] = {
+      otp,
+      expire: Date.now() + 5 * 60 * 1000,
+    };
 
-    const rating = await Rating.create({
-      vendor,
-      ratedBy: req.user._id,
-      qualityScore,
-      deliveryScore,
-      costEfficiencyScore,
-      complianceScore,
-      feedback,
-      period,
+    console.log("📧 OTP:", otp);
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: cleanEmail,
+      subject: "SVES OTP Verification",
+      html: `
+        <h2>Your OTP Code</h2>
+        <h1>${otp}</h1>
+        <p>Valid for 5 minutes</p>
+      `,
     });
 
-    await Notification.create({
-      recipient: vendor,
-      sender: req.user._id,
-      type: 'general',
-      title: 'New Performance Rating',
-      message: `You received a new performance rating. Overall score: ${rating.overallScore}/10`,
-    });
+    console.log("✅ EMAIL SENT");
 
-    res.status(201).json({ message: 'Rating submitted', rating });
+    res.json({ message: "OTP sent successfully" });
+
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.log("❌ EMAIL ERROR:", error);
+    res.status(500).json({ message: "Email send failed" });
   }
 };
 
-// @route GET /api/admin/documents
-const getAllDocuments = async (req, res) => {
+/* ================= VERIFY OTP ================= */
+const verifyOtp = async (req, res) => {
   try {
-    const { status } = req.query;
-    const query = status ? { status } : {};
+    const { email, otp } = req.body;
 
-    const docs = await Document.find(query)
-      .populate('vendor', 'name companyName email')
-      .sort({ createdAt: -1 });
+    const cleanEmail = email.toLowerCase().trim();
+    const data = otpStore[cleanEmail];
 
-    res.json({ documents: docs });
+    if (!data || data.otp !== otp || data.expire < Date.now()) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    res.json({ message: "OTP verified" });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// @route PUT /api/admin/documents/:id
-const reviewDocument = async (req, res) => {
+/* ================= RESET PASSWORD ================= */
+const resetPassword = async (req, res) => {
   try {
-    const { status, adminRemarks } = req.body;
+    const { email, newPassword } = req.body;
 
-    const doc = await Document.findByIdAndUpdate(
-      req.params.id,
-      { status, adminRemarks },
-      { new: true }
-    ).populate('vendor', 'name');
+    const cleanEmail = email.toLowerCase().trim();
 
-    await Notification.create({
-      recipient: doc.vendor._id,
-      sender: req.user._id,
-      type: 'document',
-      title: `Document ${status === 'approved' ? 'Approved' : 'Rejected'}`,
-      message: `Your document "${doc.name}" has been ${status}. ${adminRemarks || ''}`,
-    });
+    const user = await User.findOne({ email: cleanEmail });
 
-    res.json({ message: 'Document reviewed', document: doc });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    delete otpStore[cleanEmail];
+
+    res.json({ message: "Password updated successfully" });
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// @route GET /api/admin/payments
-const getAllPayments = async (req, res) => {
-  try {
-    const payments = await Payment.find()
-      .populate('vendor', 'name companyName')
-      .populate('task', 'title')
-      .sort({ createdAt: -1 });
-
-    res.json({ payments });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// @route PUT /api/admin/payments/:id/approve
-const approvePayment = async (req, res) => {
-  try {
-    const payment = await Payment.findByIdAndUpdate(
-      req.params.id,
-      { status: 'paid', approvedBy: req.user._id, paidAt: new Date() },
-      { new: true }
-    ).populate('vendor', 'name');
-
-    await Notification.create({
-      recipient: payment.vendor._id,
-      sender: req.user._id,
-      type: 'payment',
-      title: 'Payment Approved',
-      message: `Payment of ₹${payment.amount} has been approved and processed.`,
-    });
-
-    res.json({ message: 'Payment approved', payment });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// ✅ FINAL EXPORT (ADD KIYA GAYA)
+/* ================= EXPORT ================= */
 module.exports = {
-  getDashboardStats,
-  getAllVendors,
-  approveVendor,
-  rejectVendor,
-  deleteVendor,
-  getSingleVendor, // 🔥 ADD
-  getVendorRankings,
-  rateVendor,
-  getAllDocuments,
-  reviewDocument,
-  getAllPayments,
-  approvePayment,
+  register,
+  login,
+  sendOtp,
+  verifyOtp,
+  resetPassword,
+  getMe,
+  changePassword,
 };
