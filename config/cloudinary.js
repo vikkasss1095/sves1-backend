@@ -1,8 +1,7 @@
-const cloudinary = require("cloudinary").v2;
-
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-
-const multer = require("multer");
+require('dotenv').config();
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const multer = require('multer');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -12,20 +11,13 @@ cloudinary.config({
 
 const storage = new CloudinaryStorage({
   cloudinary,
-
-  params: async (req, file) => {
-    return {
-      folder: "sves1",
-      resource_type: "auto",
-    };
+  params: {
+    folder: 'sves1/documents',
+    resource_type: 'auto',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'pdf'],
   },
 });
 
-const upload = multer({
-  storage,
-});
+const upload = multer({ storage });
 
-module.exports = {
-  cloudinary,
-  upload,
-};
+module.exports = { cloudinary, upload };
