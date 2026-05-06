@@ -38,16 +38,73 @@ const getDashboardStats = async (req, res) => {
 const createVendorProfile = async (req, res) => {
   try {
 
-    console.log("BODY 👉", req.body);
-
     let data = {};
 
-    // SAFE JSON PARSE
     if (req.body.data) {
       data = JSON.parse(req.body.data);
     } else {
       data = req.body;
     }
+
+    console.log("DATA 👉", data);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        // PERSONAL
+        firstName: data.firstName || "",
+        lastName: data.lastName || "",
+        phone: data.phone || "",
+        email: data.email || "",
+
+        city: data.city || "",
+        state: data.state || "",
+
+        // COMPANY
+        companyName: data.companyName || "",
+        companyType: data.companyType || "",
+        gstNumber: data.gstNumber || "",
+        panNumber: data.panNumber || "",
+        website: data.website || "",
+
+        // PROFESSIONAL
+        category: data.category || "",
+        subCategory: data.subCategory || "",
+        currentRole: data.currentRole || "",
+        experience: data.experience || "",
+        skills: data.skills || [],
+
+        // EDUCATION
+        education: data.education || [],
+
+        // BANK
+        accountHolder: data.accountHolder || "",
+        accountNumber: data.accountNumber || "",
+        ifsc: data.ifsc || "",
+        bankName: data.bankName || "",
+        branchName: data.branchName || "",
+      },
+      {
+        new: true,
+        runValidators: false,
+      }
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Vendor profile created successfully",
+      vendor: updatedUser,
+    });
+
+  } catch (error) {
+
+    console.log("CREATE PROFILE ERROR 👉", error);
+
+    res.status(500).json({
+      message: error.message || "Server Error",
+    });
+  }
+};
 
     // UPDATE USER
     const updatedUser = await User.findByIdAndUpdate(
