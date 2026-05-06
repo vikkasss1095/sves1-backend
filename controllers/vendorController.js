@@ -40,14 +40,16 @@ const createVendorProfile = async (req, res) => {
 
     let data = {};
 
+    // SAFE PARSE
     if (req.body.data) {
       data = JSON.parse(req.body.data);
     } else {
       data = req.body;
     }
 
-    console.log("DATA 👉", data);
+    console.log("PROFILE DATA 👉", data);
 
+    // UPDATE USER
     const updatedUser = await User.findByIdAndUpdate(
       req.user._id,
       {
@@ -83,34 +85,6 @@ const createVendorProfile = async (req, res) => {
         ifsc: data.ifsc || "",
         bankName: data.bankName || "",
         branchName: data.branchName || "",
-      },
-      {
-        new: true,
-        runValidators: false,
-      }
-    );
-
-    res.status(201).json({
-      success: true,
-      message: "Vendor profile created successfully",
-      vendor: updatedUser,
-    });
-
-  } catch (error) {
-
-    console.log("CREATE PROFILE ERROR 👉", error);
-
-    res.status(500).json({
-      message: error.message || "Server Error",
-    });
-  }
-};
-
-    // UPDATE USER
-    const updatedUser = await User.findByIdAndUpdate(
-      req.user._id,
-      {
-        ...data,
       },
       {
         new: true,
