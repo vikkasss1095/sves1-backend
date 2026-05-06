@@ -7,6 +7,7 @@ const { cloudinary } = require('../config/cloudinary');
 // ================= DASHBOARD =================
 const getDashboardStats = async (req, res) => {
   try {
+
     const vendorId = req.user._id;
 
     const totalTasks = await Task.countDocuments({
@@ -38,38 +39,21 @@ const createVendorProfile = async (req, res) => {
   try {
 
     console.log("BODY 👉", req.body);
-    console.log("FILES 👉", req.files);
 
     let data = {};
 
-    // SAFE PARSE
+    // SAFE JSON PARSE
     if (req.body.data) {
       data = JSON.parse(req.body.data);
+    } else {
+      data = req.body;
     }
-
-    // FILE URLS
-    const profilePhoto =
-      req.files?.profilePhoto?.[0]?.path || "";
-
-    const resume =
-      req.files?.resume?.[0]?.path || "";
-
-    const companyLogo =
-      req.files?.companyLogo?.[0]?.path || "";
-
-    const businessLicense =
-      req.files?.businessLicense?.[0]?.path || "";
 
     // UPDATE USER
     const updatedUser = await User.findByIdAndUpdate(
       req.user._id,
       {
         ...data,
-
-        profilePhoto,
-        resume,
-        companyLogo,
-        businessLicense,
       },
       {
         new: true,
@@ -85,14 +69,14 @@ const createVendorProfile = async (req, res) => {
 
   } catch (error) {
 
-    console.log("CREATE PROFILE ERROR 👉");
-    console.log(error);
+    console.log("CREATE PROFILE ERROR 👉", error);
 
     res.status(500).json({
       message: error.message || "Server Error",
     });
   }
 };
+
 // ================= UPDATE PROFILE =================
 const updateProfile = async (req, res) => {
   try {
@@ -150,17 +134,10 @@ const uploadDocument = async (req, res) => {
   try {
 
     console.log("FILE 👉", req.file);
-    console.log("BODY 👉", req.body);
 
     if (!req.file) {
       return res.status(400).json({
         message: "No file uploaded",
-      });
-    }
-
-    if (!req.body.name || !req.body.type) {
-      return res.status(400).json({
-        message: "Missing fields",
       });
     }
 

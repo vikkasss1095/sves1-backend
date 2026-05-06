@@ -22,14 +22,6 @@ router.get(
 // ================= CREATE PROFILE =================
 router.post(
   '/profile',
-
-  upload.fields([
-    { name: 'profilePhoto', maxCount: 1 },
-    { name: 'resume', maxCount: 1 },
-    { name: 'companyLogo', maxCount: 1 },
-    { name: 'businessLicense', maxCount: 1 },
-  ]),
-
   vendorController.createVendorProfile
 );
 
