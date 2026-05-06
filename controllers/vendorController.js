@@ -37,29 +37,43 @@ const getDashboardStats = async (req, res) => {
 const createVendorProfile = async (req, res) => {
   try {
 
-    const data = JSON.parse(req.body.data);
+    console.log("BODY 👉", req.body);
+    console.log("FILES 👉", req.files);
 
-    console.log("PROFILE DATA 👉", data);
+    let data = {};
 
+    // SAFE PARSE
+    if (req.body.data) {
+      data = JSON.parse(req.body.data);
+    }
+
+    // FILE URLS
+    const profilePhoto =
+      req.files?.profilePhoto?.[0]?.path || "";
+
+    const resume =
+      req.files?.resume?.[0]?.path || "";
+
+    const companyLogo =
+      req.files?.companyLogo?.[0]?.path || "";
+
+    const businessLicense =
+      req.files?.businessLicense?.[0]?.path || "";
+
+    // UPDATE USER
     const updatedUser = await User.findByIdAndUpdate(
       req.user._id,
       {
         ...data,
 
-        profilePhoto:
-          req.files?.profilePhoto?.[0]?.path || "",
-
-        resume:
-          req.files?.resume?.[0]?.path || "",
-
-        companyLogo:
-          req.files?.companyLogo?.[0]?.path || "",
-
-        businessLicense:
-          req.files?.businessLicense?.[0]?.path || "",
+        profilePhoto,
+        resume,
+        companyLogo,
+        businessLicense,
       },
       {
         new: true,
+        runValidators: false,
       }
     );
 
@@ -71,14 +85,14 @@ const createVendorProfile = async (req, res) => {
 
   } catch (error) {
 
-    console.error("CREATE PROFILE ERROR 👉", error);
+    console.log("CREATE PROFILE ERROR 👉");
+    console.log(error);
 
     res.status(500).json({
-      message: error.message,
+      message: error.message || "Server Error",
     });
   }
 };
-
 // ================= UPDATE PROFILE =================
 const updateProfile = async (req, res) => {
   try {
