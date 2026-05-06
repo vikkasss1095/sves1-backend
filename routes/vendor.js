@@ -1,27 +1,90 @@
 const express = require('express');
+
 const router = express.Router();
 
-// 🔥 IMPORTANT FIX — सही import
 const vendorController = require('../controllers/vendorController');
 
 const { protect } = require('../middleware/authMiddleware');
+
 const { isVendor } = require('../middleware/roleMiddleware');
+
 const { upload } = require('../config/cloudinary');
 
-// middleware
+// ================= MIDDLEWARE =================
 router.use(protect, isVendor);
 
-// routes
-router.get('/dashboard', vendorController.getDashboardStats);
-router.put('/profile', vendorController.updateProfile);
-router.delete('/account', vendorController.deleteAccount);
+// ================= DASHBOARD =================
+router.get(
+  '/dashboard',
+  vendorController.getDashboardStats
+);
 
-// 🔥 MAIN ROUTE (UPLOAD)
-router.post('/documents', upload.single('file'), vendorController.uploadDocument);
+// ================= CREATE PROFILE =================
+router.post(
+  '/profile',
 
-router.get('/documents', vendorController.getDocuments);
-router.delete('/documents/:id', vendorController.deleteDocument);
-router.get('/ratings', vendorController.getRatings);
-router.get('/analytics', vendorController.getAnalytics);
+  upload.fields([
+    {
+      name: 'profilePhoto',
+      maxCount: 1,
+    },
+    {
+      name: 'resume',
+      maxCount: 1,
+    },
+    {
+      name: 'companyLogo',
+      maxCount: 1,
+    },
+    {
+      name: 'businessLicense',
+      maxCount: 1,
+    },
+  ]),
+
+  vendorController.createVendorProfile
+);
+
+// ================= UPDATE PROFILE =================
+router.put(
+  '/profile',
+  vendorController.updateProfile
+);
+
+// ================= DELETE ACCOUNT =================
+router.delete(
+  '/account',
+  vendorController.deleteAccount
+);
+
+// ================= DOCUMENT UPLOAD =================
+router.post(
+  '/documents',
+  upload.single('file'),
+  vendorController.uploadDocument
+);
+
+// ================= DOCUMENTS =================
+router.get(
+  '/documents',
+  vendorController.getDocuments
+);
+
+router.delete(
+  '/documents/:id',
+  vendorController.deleteDocument
+);
+
+// ================= RATINGS =================
+router.get(
+  '/ratings',
+  vendorController.getRatings
+);
+
+// ================= ANALYTICS =================
+router.get(
+  '/analytics',
+  vendorController.getAnalytics
+);
 
 module.exports = router;
