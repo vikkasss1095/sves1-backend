@@ -14,10 +14,10 @@ const storage = new CloudinaryStorage({
   params: {
     folder: 'sves1/documents',
     resource_type: 'auto',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'pdf'],
+    allowed_formats: ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'],
   },
 });
 
 const upload = multer({ storage });
 
-module.exports = { cloudinary, upload };
+module.exports = { cloudinary, upload }; // ✅ sirf upload export

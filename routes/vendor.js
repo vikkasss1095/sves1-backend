@@ -4,12 +4,12 @@ const router = express.Router();
 const vendorController = require('../controllers/vendorController');
 const { protect } = require('../middleware/authMiddleware');
 const { isVendor } = require('../middleware/roleMiddleware');
-const { upload, vendorUpload } = require('../config/cloudinary');
+const { upload } = require('../config/cloudinary'); // ✅ sirf upload, vendorUpload nahi
 
-// ✅ PUBLIC ROUTE — auth middleware se UPAR hona chahiye
+// ✅ PUBLIC ROUTE — auth se upar
 router.post(
   '/profile',
-  vendorUpload.fields([
+  upload.fields([           // ✅ vendorUpload.fields की जगह upload.fields
     { name: 'profilePhoto', maxCount: 1 },
     { name: 'resume', maxCount: 1 },
     { name: 'companyLogo', maxCount: 1 },
@@ -19,11 +19,11 @@ router.post(
     try {
       const User = require('../models/User');
 
-      console.log('req.body:', req.body);       // debug
-      console.log('req.files:', req.files);     // debug
+      console.log('req.body:', req.body);
+      console.log('req.files:', req.files);
 
       if (!req.body.data) {
-        return res.status(400).json({ message: 'Form data missing — req.body.data is undefined' });
+        return res.status(400).json({ message: 'Form data missing' });
       }
 
       let data;
@@ -38,10 +38,10 @@ router.post(
 
       data.name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || data.email;
 
-      if (req.files?.profilePhoto?.[0])     data.profilePhotoUrl    = req.files.profilePhoto[0].path;
-      if (req.files?.resume?.[0])           data.resumeUrl          = req.files.resume[0].path;
-      if (req.files?.companyLogo?.[0])      data.companyLogoUrl     = req.files.companyLogo[0].path;
-      if (req.files?.businessLicense?.[0])  data.businessLicenseUrl = req.files.businessLicense[0].path;
+      if (req.files?.profilePhoto?.[0])    data.profilePhotoUrl    = req.files.profilePhoto[0].path;
+      if (req.files?.resume?.[0])          data.resumeUrl          = req.files.resume[0].path;
+      if (req.files?.companyLogo?.[0])     data.companyLogoUrl     = req.files.companyLogo[0].path;
+      if (req.files?.businessLicense?.[0]) data.businessLicenseUrl = req.files.businessLicense[0].path;
 
       data.status     = 'pending';
       data.isApproved = false;
@@ -53,9 +53,8 @@ router.post(
       }
 
       const vendor = await User.create(data);
-
       res.status(201).json({
-        message: 'Profile created successfully. Admin will review and approve.',
+        message: 'Profile created successfully.',
         vendorId: vendor._id,
       });
 
@@ -70,7 +69,7 @@ router.post(
   }
 );
 
-// ✅ PROTECTED ROUTES — auth middleware NEECHE hai
+// ✅ PROTECTED ROUTES
 router.use(protect, isVendor);
 
 router.get('/dashboard', vendorController.getDashboardStats);
