@@ -1,63 +1,88 @@
-require('dotenv').config();
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const path = require('path');
+require("dotenv").config();
+
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const path = require("path");
+const compression = require("compression");
 
 const app = express();
 
-// ================= MIDDLEWARE =================
+// ================= PERFORMANCE =================
 
-// JSON
-app.use(express.json());
+// gzip compression
+app.use(compression());
 
-// 🔥🔥 FINAL CORS FIX (NO ERROR)
+// JSON limit
+app.use(express.json({ limit: "10mb" }));
+
+// ================= CORS =================
+
 app.use(
   cors({
-    origin: true, // sab allow (best for now)
+    origin: [
+      "https://sves1-frontend.vercel.app",
+      "http://localhost:5173",
+    ],
     credentials: true,
   })
 );
 
-// ================= ROUTES IMPORT =================
-const authRoutes = require('./routes/auth');
-const vendorRoutes = require('./routes/vendor');
-const adminRoutes = require('./routes/admin');
-const taskRoutes = require('./routes/task');
-const paymentRoutes = require('./routes/payment');
-const notificationRoutes = require('./routes/notification');
+// ================= STATIC FILES =================
 
-// ================= STATIC =================
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// ================= ROUTES IMPORT =================
+
+const authRoutes = require("./routes/auth");
+const vendorRoutes = require("./routes/vendor");
+const adminRoutes = require("./routes/admin");
+const taskRoutes = require("./routes/task");
+const paymentRoutes = require("./routes/payment");
+const notificationRoutes = require("./routes/notification");
 
 // ================= TEST ROUTES =================
-app.get('/', (req, res) => {
-  res.send('SVES1 Backend is Running 🚀');
+
+app.get("/", (req, res) => {
+  res.status(200).send("SVES1 Backend Running 🚀");
 });
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'SVES1 API running ✅' });
+app.get("/api/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "SVES1 API Running ✅",
+  });
 });
 
 // ================= MAIN ROUTES =================
-app.use('/api/auth', authRoutes);
-app.use('/api/vendor', vendorRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/tasks', taskRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/notifications', notificationRoutes);
+
+app.use("/api/auth", authRoutes);
+app.use("/api/vendor", vendorRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/tasks", taskRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // ================= ERROR HANDLER =================
+
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Server Error' });
+  console.error("Server Error:", err);
+
+  res.status(500).json({
+    success: false,
+    message: "Internal Server Error",
+  });
 });
 
 // ================= DATABASE =================
+
 mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
   .then(() => {
-    console.log('✅ MongoDB connected');
+    console.log("✅ MongoDB Connected");
 
     const PORT = process.env.PORT || 5000;
 
@@ -66,5 +91,10 @@ mongoose
     });
   })
   .catch((err) => {
-    console.error('❌ MongoDB connection error:', err);
+    console.log("❌ MongoDB Error:", err.message);
   });
+
+// ================= EXTRA =================
+
+// Prevent mongoose strictQuery warning
+mongoose.set("strictQuery", true);
