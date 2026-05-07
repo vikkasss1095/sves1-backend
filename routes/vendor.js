@@ -4,12 +4,12 @@ const router = express.Router();
 const vendorController = require('../controllers/vendorController');
 const { protect } = require('../middleware/authMiddleware');
 const { isVendor } = require('../middleware/roleMiddleware');
-const { upload } = require('../config/cloudinary');
+const { upload, vendorUpload } = require('../config/cloudinary');
 
-// ✅ NEW — Profile submit (NO auth required — vendor abhi register kar raha hai)
+// ✅ PUBLIC ROUTE — auth middleware se UPAR hona chahiye
 router.post(
   '/profile',
-  upload.fields([
+  vendorUpload.fields([
     { name: 'profilePhoto', maxCount: 1 },
     { name: 'resume', maxCount: 1 },
     { name: 'companyLogo', maxCount: 1 },
@@ -19,29 +19,35 @@ router.post(
     try {
       const User = require('../models/User');
 
-      // Frontend ne JSON.stringify karke bheja tha
-      const data = JSON.parse(req.body.data);
+      console.log('req.body:', req.body);       // debug
+      console.log('req.files:', req.files);     // debug
 
-      // File URLs attach karo agar upload hui hain
-      if (req.files?.profilePhoto)
-        data.profilePhotoUrl = req.files.profilePhoto[0].path; // cloudinary URL
-      if (req.files?.resume)
-        data.resumeUrl = req.files.resume[0].path;
-      if (req.files?.companyLogo)
-        data.companyLogoUrl = req.files.companyLogo[0].path;
-      if (req.files?.businessLicense)
-        data.businessLicenseUrl = req.files.businessLicense[0].path;
+      if (!req.body.data) {
+        return res.status(400).json({ message: 'Form data missing — req.body.data is undefined' });
+      }
 
-      // name field set karo (User schema me required hai)
-      data.name = `${data.firstName || ''} ${data.lastName || ''}`.trim();
+      let data;
+      try {
+        data = JSON.parse(req.body.data);
+      } catch (e) {
+        return res.status(400).json({ message: 'Invalid JSON in form data' });
+      }
 
-      // Status pending set karo
-      data.status = 'pending';
+      if (!data.email)    return res.status(400).json({ message: 'Email is required' });
+      if (!data.password) return res.status(400).json({ message: 'Password is required' });
+
+      data.name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || data.email;
+
+      if (req.files?.profilePhoto?.[0])     data.profilePhotoUrl    = req.files.profilePhoto[0].path;
+      if (req.files?.resume?.[0])           data.resumeUrl          = req.files.resume[0].path;
+      if (req.files?.companyLogo?.[0])      data.companyLogoUrl     = req.files.companyLogo[0].path;
+      if (req.files?.businessLicense?.[0])  data.businessLicenseUrl = req.files.businessLicense[0].path;
+
+      data.status     = 'pending';
       data.isApproved = false;
-      data.role = 'vendor';
+      data.role       = 'vendor';
 
-      // Email already exist toh error
-      const existing = await User.findOne({ email: data.email });
+      const existing = await User.findOne({ email: data.email.toLowerCase() });
       if (existing) {
         return res.status(400).json({ message: 'Email already registered. Please login.' });
       }
@@ -52,14 +58,19 @@ router.post(
         message: 'Profile created successfully. Admin will review and approve.',
         vendorId: vendor._id,
       });
+
     } catch (err) {
+      if (err.name === 'ValidationError') {
+        const messages = Object.values(err.errors).map(e => e.message);
+        return res.status(400).json({ message: messages.join(', ') });
+      }
       console.error('Profile submit error:', err);
       res.status(500).json({ message: err.message || 'Server error' });
     }
   }
 );
 
-// ── Existing routes (kuch mat badlo) ─────────────────────────────────────────
+// ✅ PROTECTED ROUTES — auth middleware NEECHE hai
 router.use(protect, isVendor);
 
 router.get('/dashboard', vendorController.getDashboardStats);
