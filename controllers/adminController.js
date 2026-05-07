@@ -17,7 +17,6 @@ const getDashboardStats = async (req, res) => {
         Task.countDocuments({ status: 'completed' }),
       ]);
 
-    // Monthly vendor growth (last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
@@ -75,14 +74,31 @@ const getAllVendors = async (req, res) => {
   }
 };
 
+// @route GET /api/admin/vendors/:id
+const getSingleVendor = async (req, res) => {
+  try {
+    const vendor = await User.findById(req.params.id).select('-password');
+    if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+    res.json(vendor);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // @route PUT /api/admin/vendors/:id/approve
+// ✅ CHANGE: status field bhi set kiya, rejectionReason clear kiya, notification updated
 const approveVendor = async (req, res) => {
   try {
     const vendor = await User.findByIdAndUpdate(
       req.params.id,
-      { isApproved: true },
+      {
+        isApproved: true,
+        isActive: true,
+        status: 'approved',         // ✅ NEW
+        rejectionReason: '',        // ✅ NEW — pehle reject hua tha toh clear karo
+      },
       { new: true }
-    );
+    ).select('-password');
 
     if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
 
@@ -101,13 +117,25 @@ const approveVendor = async (req, res) => {
 };
 
 // @route PUT /api/admin/vendors/:id/reject
+// ✅ CHANGE: reason body se leke DB me save kiya, status field set kiya
 const rejectVendor = async (req, res) => {
   try {
+    const { reason } = req.body;
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ message: 'Rejection reason is required' });
+    }
+
     const vendor = await User.findByIdAndUpdate(
       req.params.id,
-      { isApproved: false, isActive: false },
+      {
+        isApproved: false,
+        isActive: false,
+        status: 'rejected',              // ✅ NEW
+        rejectionReason: reason.trim(),  // ✅ NEW — DB me save
+      },
       { new: true }
-    );
+    ).select('-password');
 
     if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
 
@@ -116,10 +144,10 @@ const rejectVendor = async (req, res) => {
       sender: req.user._id,
       type: 'profile_rejected',
       title: 'Account Rejected',
-      message: req.body.reason || 'Your vendor account has been rejected by the admin.',
+      message: reason.trim(),  // ✅ same reason notification me bhi
     });
 
-    res.json({ message: 'Vendor rejected' });
+    res.json({ message: 'Vendor rejected', vendor });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -130,21 +158,6 @@ const deleteVendor = async (req, res) => {
   try {
     await User.findByIdAndDelete(req.params.id);
     res.json({ message: 'Vendor deleted' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// 🔥 ✅ ADD KIYA GAYA FUNCTION (ONLY NEW ADDITION)
-const getSingleVendor = async (req, res) => {
-  try {
-    const vendor = await User.findById(req.params.id).select('-password');
-
-    if (!vendor) {
-      return res.status(404).json({ message: 'Vendor not found' });
-    }
-
-    res.json(vendor);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -190,7 +203,15 @@ const getVendorRankings = async (req, res) => {
 // @route POST /api/admin/ratings
 const rateVendor = async (req, res) => {
   try {
-    const { vendor, qualityScore, deliveryScore, costEfficiencyScore, complianceScore, feedback, period } = req.body;
+    const {
+      vendor,
+      qualityScore,
+      deliveryScore,
+      costEfficiencyScore,
+      complianceScore,
+      feedback,
+      period,
+    } = req.body;
 
     const rating = await Rating.create({
       vendor,
@@ -295,14 +316,13 @@ const approvePayment = async (req, res) => {
   }
 };
 
-// ✅ FINAL EXPORT (ADD KIYA GAYA)
 module.exports = {
   getDashboardStats,
   getAllVendors,
+  getSingleVendor,
   approveVendor,
   rejectVendor,
   deleteVendor,
-  getSingleVendor, // 🔥 ADD
   getVendorRankings,
   rateVendor,
   getAllDocuments,
